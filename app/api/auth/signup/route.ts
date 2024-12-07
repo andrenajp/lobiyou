@@ -4,6 +4,8 @@ import { createUser, getUserByEmail } from "@/lib/auth/user";
 import { SignJWT } from "jose";
 import { getJwtSecret } from "@/lib/auth/config";
 import { sendVerificationEmail } from '@/lib/mailer';
+import { createVerificationToken } from '@/lib/auth/verification';
+
 const secret = getJwtSecret();
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +15,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { name, email, password, role } = signupSchema.parse(body);
 
+    // Vérifier si l'email existe déjà
     const existingUser = await getUserByEmail(email);
     if (existingUser) {
       return NextResponse.json(
@@ -23,7 +26,16 @@ export async function POST(req: Request) {
 
     const user = await createUser({ name, email, password, role });
 
-    // Créer le token JWT
+    console.log('Created user:', {
+      id: user.id,
+      email: user.email,
+      role: user.role
+    });
+
+    // Créer le token de vérification
+    const verificationToken = await createVerificationToken(user.id);
+
+    // Créer le token JWT pour l'authentification
     const token = await new SignJWT({ 
       userId: user.id,
       email: user.email,
@@ -42,27 +54,21 @@ export async function POST(req: Request) {
           id: user.id,
           email: user.email,
           name: user.name,
-          userType: user.userType,
+          userType: user.role,
         }
       },
       { status: 201 }
     );
 
-    response.cookies.set({
-      name: 'auth-token',
-      value: token,
+    response.cookies.set("auth-token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: 60 * 60 * 24 // 24 heures
     });
 
-    console.log("User email:", email);
-    console.log("JWT token:", token);
-
     // Envoyer l'email de validation
-    await sendVerificationEmail(email, token);
+    await sendVerificationEmail(email, verificationToken);
 
     return response;
   } catch (error) {

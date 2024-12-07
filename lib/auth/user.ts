@@ -22,12 +22,12 @@ export async function createUser({ name, email, password, role }: {
     [id, email, hashedPassword, name, role]
   );
 
-  const [user] = await db.execute(
+  const [rows] = await db.execute(
     'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
     [id]
-  );
+  ) as any[];
 
-  return user;
+  return rows[0];
 }
 
 export async function getUserByEmail(email: string) {
