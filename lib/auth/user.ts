@@ -4,28 +4,44 @@ import { customAlphabet } from 'nanoid';
 
 const nanoid = customAlphabet('1234567890abcdef', 10);
 
-export async function createUser({ name, email, password, userType }: {
+type UserRole = 'admin' | 'donnateur' | 'leveur' | 'partenaire';
+
+export async function createUser({ name, email, password, role }: {
   name: string;
   email: string;
   password: string;
-  userType: 'DONOR' | 'PROJECT_OWNER';
+  role: UserRole;
 }) {
   const db = await getDb();
   const hashedPassword = await hashPassword(password);
-  const now = new Date().toISOString();
   const id = nanoid();
 
-  await db.run(
-    `INSERT INTO users (id, email, password, name, userType, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, email, hashedPassword, name, userType, now, now]
+  const [result] = await db.execute(
+    `INSERT INTO users (id, email, password, name, role)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, email, hashedPassword, name, role]
   );
 
-  const user = await db.get('SELECT id, email, name, userType, createdAt, updatedAt FROM users WHERE id = ?', [id]);
+  const [user] = await db.execute(
+    'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
+    [id]
+  );
+
   return user;
 }
 
 export async function getUserByEmail(email: string) {
   const db = await getDb();
-  return db.get('SELECT * FROM users WHERE email = ?', [email]);
+  const [rows] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
+  return rows[0];
+}
+
+export async function getUserById(id: string) {
+  if (!id) {
+    throw new Error('ID utilisateur requis');
+  }
+  
+  const db = await getDb();
+  const [rows] = await db.execute('SELECT * FROM users WHERE id = ?', [id]);
+  return rows[0];
 }

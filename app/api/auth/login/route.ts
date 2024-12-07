@@ -3,11 +3,11 @@ import { loginSchema } from "@/lib/auth/validation"
 import { getUserByEmail } from "@/lib/auth/user"
 import { verifyPassword } from "@/lib/auth/password"
 import { SignJWT } from "jose"
-import { cookies } from "next/headers"
+import { getJwtSecret } from "@/lib/auth/config"
 
-const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET || "your-secret-key-at-least-32-characters"
-)
+const secret = new TextEncoder().encode(getJwtSecret())
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
@@ -36,22 +36,31 @@ export async function POST(req: Request) {
       .setExpirationTime("24h")
       .sign(secret)
 
-    // Set cookie
-    cookies().set("auth-token", token, {
+    const response = NextResponse.json(
+      { 
+        success: true, 
+        message: "Connexion réussie",
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          userType: user.userType,
+        }
+      },
+      { status: 200 }
+    );
+
+    response.cookies.set({
+      name: "auth-token",
+      value: token,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 24 hours
-    })
+      path: "/",
+      maxAge: 60 * 60 * 24 // 24 heures
+    });
 
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        userType: user.userType,
-      },
-    })
+    return response;
   } catch (error) {
     console.error("Erreur lors de la connexion:", error)
     return NextResponse.json(

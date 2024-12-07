@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/components/ui/use-toast"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -16,8 +17,8 @@ const signupSchema = z.object({
   name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide"),
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
-  userType: z.enum(["DONOR", "PROJECT_OWNER"], {
-    required_error: "Veuillez sélectionner un type d'utilisateur",
+  role: z.enum(["donnateur", "leveur", "partenaire"], {
+    required_error: "Veuillez sélectionner un rôle",
   }),
 })
 
@@ -25,14 +26,19 @@ type SignupForm = z.infer<typeof signupSchema>
 
 export default function SignUp() {
   const { toast } = useToast()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
+    defaultValues: {
+      role: "donnateur"
+    }
   })
 
   const onSubmit = async (data: SignupForm) => {
@@ -44,18 +50,23 @@ export default function SignUp() {
         body: JSON.stringify(data),
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        throw new Error("Erreur lors de l'inscription")
+        throw new Error(result.error || "Erreur lors de l'inscription")
       }
 
       toast({
         title: "Inscription réussie !",
-        description: "Vous pouvez maintenant vous connecter.",
+        description: "Vous allez être redirigé vers votre tableau de bord.",
       })
+
+      // Redirection vers le tableau de bord
+      router.push("/dashboard")
     } catch (error) {
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de l'inscription.",
+        description: error instanceof Error ? error.message : "Une erreur est survenue lors de l'inscription.",
         variant: "destructive",
       })
     } finally {
@@ -75,7 +86,7 @@ export default function SignUp() {
       <Card className="max-w-md mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">Créer votre compte</h1>
         
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium mb-2">
               Nom complet
@@ -125,42 +136,57 @@ export default function SignUp() {
 
           <div className="space-y-2">
             <label className="block text-sm font-medium mb-2">
-              Type de compte
+              Je souhaite m'inscrire comme
             </label>
             <RadioGroup
-              defaultValue="DONOR"
-              {...register("userType")}
-              className="grid grid-cols-2 gap-4"
+              defaultValue="donnateur"
+              className="grid grid-cols-3 gap-4"
+              onValueChange={(value) => {
+                setValue("role", value as "donnateur" | "leveur" | "partenaire");
+              }}
             >
               <div>
                 <RadioGroupItem
-                  value="DONOR"
-                  id="donor"
+                  value="donnateur"
+                  id="donnateur"
                   className="peer sr-only"
                 />
                 <label
-                  htmlFor="donor"
+                  htmlFor="donnateur"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                 >
-                  <span className="text-sm font-medium">Donateur/Investisseur</span>
+                  <span className="font-semibold">Donateur</span>
                 </label>
               </div>
               <div>
                 <RadioGroupItem
-                  value="PROJECT_OWNER"
-                  id="project-owner"
+                  value="leveur"
+                  id="leveur"
                   className="peer sr-only"
                 />
                 <label
-                  htmlFor="project-owner"
+                  htmlFor="leveur"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                 >
-                  <span className="text-sm font-medium">Porteur de projet</span>
+                  <span className="font-semibold">Porteur de projet</span>
+                </label>
+              </div>
+              <div>
+                <RadioGroupItem
+                  value="partenaire"
+                  id="partenaire"
+                  className="peer sr-only"
+                />
+                <label
+                  htmlFor="partenaire"
+                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                >
+                  <span className="font-semibold">Partenaire</span>
                 </label>
               </div>
             </RadioGroup>
-            {errors.userType && (
-              <p className="text-red-500 text-sm mt-1">{errors.userType.message}</p>
+            {errors.role && (
+              <p className="text-sm text-red-500">{errors.role.message}</p>
             )}
           </div>
 
