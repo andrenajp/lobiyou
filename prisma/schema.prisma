@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  userType  UserType
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  projects    Project[]    // Pour les porteurs de projet
+  investments Investment[] // Pour les donateurs/investisseurs
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  goal        Float
+  currentAmount Float  @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  status      ProjectStatus @default(DRAFT)
+  
+  // Relations
+  creator     User   @relation(fields: [creatorId], references: [id])
+  creatorId   String
+  investments Investment[]
+}
+
+model Investment {
+  id        String   @id @default(cuid())
+  amount    Float
+  type      InvestmentType
+  createdAt DateTime @default(now())
+  
+  // Relations
+  investor   User    @relation(fields: [investorId], references: [id])
+  investorId String
+  project    Project @relation(fields: [projectId], references: [id])
+  projectId  String
+}
+
+enum UserType {
+  DONOR
+  PROJECT_OWNER
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  FUNDED
+  COMPLETED
+  CANCELLED
+}
+
+enum InvestmentType {
+  ONE_TIME
+  MONTHLY
+  AD_SUPPORTED
+}
