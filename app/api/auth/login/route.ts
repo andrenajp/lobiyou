@@ -3,9 +3,8 @@ import { loginSchema } from "@/lib/auth/validation"
 import { getUserByEmail } from "@/lib/auth/user"
 import { verifyPassword } from "@/lib/auth/password"
 import { SignJWT } from "jose"
-import { getJwtSecret } from "@/lib/auth/config"
-
-const secret = new TextEncoder().encode(getJwtSecret())
+import { getJwtSecretKey } from "@/lib/auth/config"
+import { cookies } from "next/headers"
 
 export const dynamic = 'force-dynamic';
 
@@ -17,25 +16,29 @@ export async function POST(req: Request) {
     const user = await getUserByEmail(email)
     if (!user) {
       return NextResponse.json(
-        { error: "Identifiants invalides" },
-        { status: 401 }
+        { error: "Email ou mot de passe incorrect" },
+        { status: 400 }
       )
     }
 
-    const isValid = await verifyPassword(password, user.password)
-    if (!isValid) {
+    const isValidPassword = await verifyPassword(password, user.password)
+    if (!isValidPassword) {
       return NextResponse.json(
-        { error: "Identifiants invalides" },
-        { status: 401 }
+        { error: "Email ou mot de passe incorrect" },
+        { status: 400 }
       )
     }
 
-    // Create JWT token
-    const token = await new SignJWT({ userId: user.id })
+    const token = await new SignJWT({ 
+      userId: user.id,
+      email: user.email,
+      role: user.role 
+    })
       .setProtectedHeader({ alg: "HS256" })
       .setExpirationTime("24h")
-      .sign(secret)
+      .sign(getJwtSecretKey())
 
+    const cookieStore = await cookies()
     const response = NextResponse.json(
       { 
         success: true, 
@@ -44,19 +47,16 @@ export async function POST(req: Request) {
           id: user.id,
           email: user.email,
           name: user.name,
-          userType: user.userType,
+          role: user.role,
         }
       },
       { status: 200 }
     );
 
-    response.cookies.set({
-      name: "auth-token",
-      value: token,
+    cookieStore.set("auth-token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      path: "/",
       maxAge: 60 * 60 * 24 // 24 heures
     });
 
